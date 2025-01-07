@@ -5,6 +5,7 @@ import com.ctre.phoenix6.hardware.CANcoder;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.SparkClosedLoopController.ArbFFUnits;
 import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
@@ -17,7 +18,6 @@ import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -27,7 +27,6 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.lib.config.SwerveModuleConstants;
 import frc.robot.Constants;
 import frc.robot.Constants.GlobalConstants;
-import frc.robot.Constants.ShooterConstants;
 import frc.robot.Constants.SwerveConstants;
 import frc.robot.Pref;
 
@@ -89,9 +88,10 @@ public class SwerveModule extends SubsystemBase {
         .velocityConversionFactor(Constants.SwerveConstants.driveConversionVelocityFactor);
     driveConfig.closedLoop
         .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
-        .velocityFF(ShooterConstants.topShooterKFF)
         .outputRange(0, 1)
-        .pid(Constants.SwerveConstants.driveKP, Constants.SwerveConstants.driveKI, Constants.SwerveConstants.driveKD);
+        .pid(Constants.SwerveConstants.driveKP,
+            Constants.SwerveConstants.driveKI,
+            Constants.SwerveConstants.driveKD);
     driveConfig.signals.primaryEncoderPositionPeriodMs(5);
     driveMotor.configure(driveConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
@@ -176,7 +176,9 @@ public class SwerveModule extends SubsystemBase {
 
     if (!isOpenLoop) {
       if (!feedforward) {
-        driveController.setReference(desiredState.speedMetersPerSecond, SparkMax.ControlType.kVelocity);
+        driveController.setReference(
+            desiredState.speedMetersPerSecond, SparkMax.ControlType.kVelocity, ClosedLoopSlot.kSlot0,
+            feedForward, ArbFFUnits.kVoltage);
       } else {
         double temp = previousState.speedMetersPerSecond;
         if (temp == 0)

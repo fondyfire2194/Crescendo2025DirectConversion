@@ -126,20 +126,16 @@ public class SwerveModule extends SubsystemBase {
   }
 
   public void setDesiredState(SwerveModuleState desiredState, boolean isOpenLoop) {
-    SwerveModuleState optimizedState = SwerveModuleState.optimize(desiredState, getAngle());
-
-    currentDesiredState = optimizedState;
+    desiredState.optimize(getAngle());
+    currentDesiredState = desiredState;
 
     if (SwerveConstants.useCosineCompensation) {
-      double cosineScalar = optimizedState.angle.minus(getAngle()).getCos();
-      if (cosineScalar < 0.0) {
-        cosineScalar = 1.0;
-      }
-      optimizedState.speedMetersPerSecond *= cosineScalar;
+      currentDesiredState.cosineScale(getAngle());
     }
-    setAngle(optimizedState);
 
-    setSpeed(optimizedState, isOpenLoop);
+    setAngle(currentDesiredState);
+
+    setSpeed(currentDesiredState, isOpenLoop);
   }
 
   public SwerveModuleState getDesiredState() {

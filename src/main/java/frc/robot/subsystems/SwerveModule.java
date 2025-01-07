@@ -1,31 +1,23 @@
 package frc.robot.subsystems;
 
-import org.w3c.dom.ls.LSParser;
-
-import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix6.hardware.CANcoder;
-import com.revrobotics.REVLibError;
-import com.revrobotics.RelativeEncoder;
+
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkClosedLoopController;
-import com.revrobotics.spark.SparkClosedLoopController.ArbFFUnits;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
-import com.revrobotics.spark.SparkLowLevel.PeriodicFrame;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
-
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -110,15 +102,14 @@ public class SwerveModule extends SubsystemBase {
         .positionConversionFactor(Constants.SwerveConstants.angleConversionFactor);
     turnConfig.closedLoop
         .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
-
-        .outputRange(0, 1)
+        .outputRange(-1, 1)
         .positionWrappingMaxInput(180)
         .positionWrappingMinInput(-180)
         .positionWrappingEnabled(true)
-        .pidf(Constants.SwerveConstants.angleKP[moduleNumber],
+        .pid(Constants.SwerveConstants.angleKP[moduleNumber],
             Constants.SwerveConstants.angleKI[moduleNumber],
             Constants.SwerveConstants.angleKD[moduleNumber],
-            Constants.SwerveConstants.angleKFF[moduleNumber]);
+            ClosedLoopSlot.kSlot0);
     turnConfig.signals.primaryEncoderPositionPeriodMs(5);
     angleMotor.configure(turnConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
@@ -138,7 +129,6 @@ public class SwerveModule extends SubsystemBase {
     SwerveModuleState optimizedState = SwerveModuleState.optimize(desiredState, getAngle());
 
     currentDesiredState = optimizedState;
-    // https://www.chiefdelphi.com/t/yet-another-generic-swerve-library-yagsl-beta/425148/860
 
     if (SwerveConstants.useCosineCompensation) {
       double cosineScalar = optimizedState.angle.minus(getAngle()).getCos();
@@ -196,11 +186,7 @@ public class SwerveModule extends SubsystemBase {
         acceleration = Math.min(Math.max(acceleration, -5), 5);
         tuning = false;
 
-        if (!tuning)
-          feedForward = driveFeedforward.calculate(
-              desiredState.speedMetersPerSecond, acceleration);
-        else
-          feedForward = calculate(desiredState.speedMetersPerSecond, acceleration);
+        feedForward = calculate(desiredState.speedMetersPerSecond, acceleration);
 
         feedForward = MathUtil.clamp(feedForward, -12.0, 12.0);
 
@@ -227,7 +213,7 @@ public class SwerveModule extends SubsystemBase {
             : desiredState.angle;
     String a = "Modules//" + String.valueOf(moduleNumber);
     SmartDashboard.putNumber(a + " DesAngle", desiredState.angle.getDegrees());
-    angleController.setReference(angle.getDegrees(), ControlType.kPosition);
+    angleController.setReference(angle.getDegrees(), ControlType.kPosition, ClosedLoopSlot.kSlot0);
 
     rotationalAcceleration = angle.getDegrees() - lastAngle.getDegrees() / .02;
     lastAngle = angle;
@@ -291,6 +277,10 @@ public class SwerveModule extends SubsystemBase {
     }
   }
 
+  public double getAngleKp() {
+    return angleMotor.configAccessor.closedLoop.getP(ClosedLoopSlot.kSlot0);
+  }
+
   public double getAcceleration() {
     return acceleration;
   }
@@ -321,7 +311,10 @@ public class SwerveModule extends SubsystemBase {
 
     SmartDashboard.putNumber(a + " DrivePosition", getDrivePosition());
     SmartDashboard.putNumber(a + " CanCoderAngle", getCancoderDeg());
-    SmartDashboard.putNumber(a + " TurnAngle", Units.radiansToDegrees(getPositionRadians()));
+
+    SmartDashboard.putNumber(a + " TurnEncoderAngle", angleMotor.getEncoder().getPosition());
+    SmartDashboard.putNumber(a + " TurnMotorPower", angleMotor.get());
+    SmartDashboard.putNumber("AngleKp", getAngleKp());
 
     if (tuning) {
       SmartDashboard.putNumber(a + " VelocityError", velocityError);
